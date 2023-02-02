@@ -125,7 +125,6 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       cachesize: 1000
        endpoint: unix:///@kms-provider.sock
 `
 
@@ -141,7 +140,7 @@ resources:
 	}
 	defer pluginMock.CleanUp()
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", false)
+	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -229,7 +228,6 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       cachesize: 1000
        endpoint: unix:///@kms-provider.sock
 `
 	pluginMock, err := kmsv2mock.NewBase64Plugin("@kms-provider.sock")
@@ -243,7 +241,7 @@ resources:
 	}
 	defer pluginMock.CleanUp()
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", false)
+	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -369,7 +367,7 @@ resources:
 		t.Fatalf("Failed to start KMS Plugin #2: err: %v", err)
 	}
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", false)
+	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
 	}
@@ -442,7 +440,6 @@ resources:
     - kms:
        apiVersion: v2
        name: kms-provider
-       cachesize: 1000
        endpoint: unix:///@kms-provider.sock
 `
 
@@ -457,7 +454,7 @@ resources:
 	}
 	t.Cleanup(pluginMock.CleanUp)
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", false)
+	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}

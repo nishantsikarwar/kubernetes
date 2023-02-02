@@ -41280,7 +41280,10 @@ func schema_k8sio_api_resource_v1alpha1_ResourceClaimStatus(ref common.Reference
 					"reservedFor": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"uid",
+								},
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -44438,7 +44441,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceConversion(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"strategy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "strategy specifies how custom resources are converted between versions. Allowed values are: - `None`: The converter only change the apiVersion and would not touch any other field in the custom resource. - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information\n  is needed for this option. This requires spec.preserveUnknownFields to be false, and spec.conversion.webhook to be set.",
+							Description: "strategy specifies how custom resources are converted between versions. Allowed values are: - `\"None\"`: The converter only change the apiVersion and would not touch any other field in the custom resource. - `\"Webhook\"`: API Server will call to an external webhook to do the conversion. Additional information\n  is needed for this option. This requires spec.preserveUnknownFields to be false, and spec.conversion.webhook to be set.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -44446,7 +44449,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceConversion(ref common.Refere
 					},
 					"webhook": {
 						SchemaProps: spec.SchemaProps{
-							Description: "webhook describes how to call the conversion webhook. Required when `strategy` is set to `Webhook`.",
+							Description: "webhook describes how to call the conversion webhook. Required when `strategy` is set to `\"Webhook\"`.",
 							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookConversion"),
 						},
 					},
@@ -47489,7 +47492,7 @@ func schema_pkg_apis_meta_v1_CreateOptions(ref common.ReferenceCallback) common.
 					},
 					"fieldValidation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields, provided that the `ServerSideFieldValidation` feature gate is also enabled. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23 and is the default behavior when the `ServerSideFieldValidation` feature gate is disabled. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default when the `ServerSideFieldValidation` feature gate is enabled. - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -48583,7 +48586,7 @@ func schema_pkg_apis_meta_v1_PatchOptions(ref common.ReferenceCallback) common.O
 					},
 					"fieldValidation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields, provided that the `ServerSideFieldValidation` feature gate is also enabled. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23 and is the default behavior when the `ServerSideFieldValidation` feature gate is disabled. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default when the `ServerSideFieldValidation` feature gate is enabled. - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -49210,7 +49213,7 @@ func schema_pkg_apis_meta_v1_UpdateOptions(ref common.ReferenceCallback) common.
 					},
 					"fieldValidation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields, provided that the `ServerSideFieldValidation` feature gate is also enabled. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23 and is the default behavior when the `ServerSideFieldValidation` feature gate is disabled. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default when the `ServerSideFieldValidation` feature gate is enabled. - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+							Description: "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -50466,6 +50469,13 @@ func schema_k8sio_cloud_provider_config_v1alpha1_CloudControllerManagerConfigura
 							Ref:         ref("k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration"),
 						},
 					},
+					"NodeController": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeController holds configuration for node controller related features.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/cloud-provider/controllers/node/config/v1alpha1.NodeControllerConfiguration"),
+						},
+					},
 					"ServiceController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ServiceControllerConfiguration holds configuration for ServiceController related features.",
@@ -50481,11 +50491,11 @@ func schema_k8sio_cloud_provider_config_v1alpha1_CloudControllerManagerConfigura
 						},
 					},
 				},
-				Required: []string{"Generic", "KubeCloudShared", "ServiceController", "NodeStatusUpdateFrequency"},
+				Required: []string{"Generic", "KubeCloudShared", "NodeController", "ServiceController", "NodeStatusUpdateFrequency"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration", "k8s.io/cloud-provider/controllers/service/config/v1alpha1.ServiceControllerConfiguration", "k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration", "k8s.io/cloud-provider/controllers/node/config/v1alpha1.NodeControllerConfiguration", "k8s.io/cloud-provider/controllers/service/config/v1alpha1.ServiceControllerConfiguration", "k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration"},
 	}
 }
 
@@ -53561,7 +53571,7 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables lock contention profiling, if enableProfiling is true.",
+							Description: "enableContentionProfiling enables block profiling, if enableProfiling is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -54688,7 +54698,7 @@ func schema_k8sio_kube_scheduler_config_v1beta2_KubeSchedulerConfiguration(ref c
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables lock contention profiling, if enableProfiling is true.",
+							Description: "enableContentionProfiling enables block profiling, if enableProfiling is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -55794,7 +55804,7 @@ func schema_k8sio_kube_scheduler_config_v1beta3_KubeSchedulerConfiguration(ref c
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables lock contention profiling, if enableProfiling is true.",
+							Description: "enableContentionProfiling enables block profiling, if enableProfiling is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -57305,7 +57315,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"enableContentionProfiling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true. Default: false",
+							Description: "enableContentionProfiling enables block profiling, if enableDebuggingHandlers is true. Default: false",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},

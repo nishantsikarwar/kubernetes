@@ -161,7 +161,7 @@ func LoadEncryptionConfig(ctx context.Context, filepath string, reload bool) (*E
 		kmsHealthChecks = []healthz.HealthChecker{kmsHealthChecker(kmsHealthChecks)}
 	}
 
-	// KMSTimeout is the duration we will wait before closing old transformers.
+	// KMSCloseGracePeriod is the duration we will wait before closing old transformers.
 	// The way we calculate is as follows:
 	// 1. Sum all timeouts across all KMS plugins. (check kmsPrefixTransformer for differences between v1 and v2)
 	// 2. Multiply that by 2 (to allow for some buffer)
@@ -582,8 +582,11 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 		keyID := ""
 		probe.keyID.Store(&keyID)
 
+		// prime keyID by running the check inline once (this prevents unit tests from flaking)
+		// ignore the error here since we want to support the plugin starting up async with the API server
+		_ = probe.check(ctx)
 		// make sure that the plugin's key ID is reasonably up-to-date
-		go wait.PollImmediateUntilWithContext(
+		go wait.PollUntilWithContext(
 			ctx,
 			kmsPluginHealthzInterval,
 			func(ctx context.Context) (bool, error) {
@@ -595,7 +598,7 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 
 		// using AES-GCM by default for encrypting data with KMSv2
 		transformer := value.PrefixTransformer{
-			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, probe.getCurrentKeyID, int(*config.CacheSize), aestransformer.NewGCMTransformer),
+			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, probe.getCurrentKeyID, aestransformer.NewGCMTransformer),
 			Prefix:      []byte(kmsTransformerPrefixV2 + kmsName + ":"),
 		}
 

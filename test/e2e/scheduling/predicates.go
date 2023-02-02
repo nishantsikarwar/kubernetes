@@ -36,6 +36,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -238,7 +239,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			framework.ExpectNoError(err, "unable to apply fake resource to %v", testNodeName)
 
 			// Register a runtimeClass with overhead set as 25% of the available beard-seconds
-			handler = e2enode.PreconfiguredRuntimeClassHandler
+			handler = e2eruntimeclass.PreconfiguredRuntimeClassHandler
 
 			rc := &nodev1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: handler},
@@ -270,7 +271,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			}
 
 			// remove RuntimeClass
-			_ = cs.NodeV1beta1().RuntimeClasses().Delete(ctx, e2enode.PreconfiguredRuntimeClassHandler, metav1.DeleteOptions{})
+			_ = cs.NodeV1beta1().RuntimeClasses().Delete(ctx, e2eruntimeclass.PreconfiguredRuntimeClassHandler, metav1.DeleteOptions{})
 		})
 
 		ginkgo.It("verify pod overhead is accounted for", func(ctx context.Context) {
@@ -951,12 +952,8 @@ func createPausePod(ctx context.Context, f *framework.Framework, conf pausePodCo
 }
 
 func runPausePod(ctx context.Context, f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	return runPausePodWithTimeout(ctx, f, conf, framework.PollShortTimeout)
-}
-
-func runPausePodWithTimeout(ctx context.Context, f *framework.Framework, conf pausePodConfig, timeout time.Duration) *v1.Pod {
 	pod := createPausePod(ctx, f, conf)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, timeout))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartShort))
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
