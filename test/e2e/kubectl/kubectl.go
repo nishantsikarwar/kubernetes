@@ -38,6 +38,7 @@ import (
 	"time"
 
 	openapi_v2 "github.com/google/gnostic/openapiv2"
+	"github.com/google/go-cmp/cmp"
 
 	"sigs.k8s.io/yaml"
 
@@ -45,9 +46,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
@@ -411,7 +414,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{simplePodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, simplePodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
@@ -734,7 +737,7 @@ metadata:
 				if !strings.Contains(ee.String(), "timed out") {
 					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
 				}
-				framework.ExpectNoError(e2epod.WaitForPodToDisappear(ctx, f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
+				framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "failure-3", ns, 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
 			})
 
 			ginkgo.It("[Slow] running a failing command with --leave-stdin-open", func(ctx context.Context) {
@@ -753,7 +756,7 @@ metadata:
 					return strings.Contains(logOutput, content), nil
 				})
 
-				gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("unexpected error waiting for '%v' output", content))
+				framework.ExpectNoError(err, "waiting for '%v' output", content)
 				return logOutput
 			}
 
@@ -768,7 +771,7 @@ metadata:
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(ctx, "run-test", metav1.DeleteOptions{})).To(gomega.BeNil())
+			framework.ExpectNoError(c.CoreV1().Pods(ns).Delete(ctx, "run-test", metav1.DeleteOptions{}))
 
 			ginkgo.By("executing a command with run and attach without stdin")
 			// There is a race on this scenario described in #73099
@@ -784,7 +787,7 @@ metadata:
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(ctx, "run-test-2", metav1.DeleteOptions{})).To(gomega.BeNil())
+			framework.ExpectNoError(c.CoreV1().Pods(ns).Delete(ctx, "run-test-2", metav1.DeleteOptions{}))
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
 			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -798,11 +801,9 @@ metadata:
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
 			framework.ExpectNoError(err)
-			if !e2epod.CheckPodsRunningReady(ctx, c, ns, []string{runTestPod.Name}, time.Minute) {
-				framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
-			}
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, runTestPod.Name, ns, time.Minute))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(ctx, "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
+			framework.ExpectNoError(c.CoreV1().Pods(ns).Delete(ctx, "run-test-3", metav1.DeleteOptions{}))
 		})
 
 		ginkgo.It("should contain last line of the log", func(ctx context.Context) {
@@ -844,6 +845,65 @@ metadata:
 			for _, component := range components {
 				ginkgo.By("getting status of " + component)
 				e2ekubectl.RunKubectlOrDie(ns, "get", "componentstatuses", component)
+			}
+		})
+	})
+
+	ginkgo.Describe("Kubectl prune with applyset", func() {
+		ginkgo.It("should apply and prune objects", func(ctx context.Context) {
+			framework.Logf("applying manifest1")
+			manifest1 := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+  namespace: {{ns}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm2
+  namespace: {{ns}}
+`
+
+			manifest1 = strings.ReplaceAll(manifest1, "{{ns}}", ns)
+			args := []string{"apply", "--prune", "--applyset=applyset1", "-f", "-"}
+			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest1).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects := mustListObjectsInNamespace(ctx, c, ns)
+			names := mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1", "cm2"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
+			}
+
+			framework.Logf("applying manifest2")
+			manifest2 := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+  namespace: {{ns}}
+`
+			manifest2 = strings.ReplaceAll(manifest2, "{{ns}}", ns)
+
+			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects = mustListObjectsInNamespace(ctx, c, ns)
+			names = mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
+			}
+
+			framework.Logf("applying manifest2 (again)")
+			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
+
+			framework.Logf("checking which objects exist")
+			objects = mustListObjectsInNamespace(ctx, c, ns)
+			names = mustGetNames(objects)
+			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
+				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
 			}
 		})
 	})
@@ -1384,7 +1444,7 @@ metadata:
 			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 				cj, err := c.BatchV1().CronJobs(ns).List(ctx, metav1.ListOptions{})
 				if err != nil {
-					return false, fmt.Errorf("Failed getting CronJob %s: %v", ns, err)
+					return false, fmt.Errorf("Failed getting CronJob %s: %w", ns, err)
 				}
 				return len(cj.Items) > 0, nil
 			})
@@ -1500,7 +1560,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{pausePodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, pausePodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
@@ -1539,7 +1599,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{busyboxPodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, busyboxPodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
@@ -1974,6 +2034,42 @@ metadata:
 			e2ekubectl.RunKubectlOrDie(ns, "wait", "--for=delete", "pod", "--selector=app.kubernetes.io/name=noexist")
 		})
 	})
+
+	ginkgo.Describe("kubectl subresource flag", func() {
+		ginkgo.It("should not be used in a bulk GET", func() {
+			ginkgo.By("calling kubectl get nodes --subresource=status")
+			out, err := e2ekubectl.RunKubectl("", "get", "nodes", "--subresource=status")
+			gomega.Expect(err).To(gomega.HaveOccurred(), fmt.Sprintf("Expected kubectl to fail, but it succeeded: %s", out))
+			gomega.Expect(err).To(gomega.ContainSubstring("subresource cannot be used when bulk resources are specified"))
+		})
+		ginkgo.It("GET on status subresource of built-in type (node) returns identical info as GET on the built-in type", func(ctx context.Context) {
+			ginkgo.By("first listing nodes in the cluster, and using first node of the list")
+			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
+			node := nodes.Items[0]
+			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s", node.Name))
+			outBuiltIn := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name)
+			ginkgo.By(fmt.Sprintf("calling kubectl get nodes %s --subresource=status", node.Name))
+			outStatusSubresource := e2ekubectl.RunKubectlOrDie("", "get", "nodes", node.Name, "--subresource=status")
+			// Avoid comparing values of fields that might end up
+			// changing between the two invocations of kubectl.
+			requiredOutput := [][]string{
+				{"NAME"},
+				{"STATUS"},
+				{"ROLES"},
+				{"AGE"},
+				{"VERSION"},
+				{node.Name},                           // check for NAME
+				{""},                                  // avoid comparing STATUS
+				{""},                                  // avoid comparing ROLES
+				{""},                                  // avoid comparing AGE
+				{node.Status.NodeInfo.KubeletVersion}, // check for VERSION
+			}
+			checkOutput(outBuiltIn, requiredOutput)
+			checkOutput(outStatusSubresource, requiredOutput)
+		})
+	})
 })
 
 // Checks whether the output split by line contains the required elements.
@@ -2028,11 +2124,11 @@ func checkContainersImage(containers []v1.Container, expectImage string) bool {
 func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 	body, err := curl(apiEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("Failed http.Get of %s: %v", apiEndpoint, err)
+		return nil, fmt.Errorf("Failed http.Get of %s: %w", apiEndpoint, err)
 	}
 	var apiVersions metav1.APIVersions
 	if err := json.Unmarshal([]byte(body), &apiVersions); err != nil {
-		return nil, fmt.Errorf("Failed to parse /api output %s: %v", body, err)
+		return nil, fmt.Errorf("Failed to parse /api output %s: %w", body, err)
 	}
 	return &apiVersions, nil
 }
@@ -2050,7 +2146,7 @@ func startProxyServer(ns string) (int, *exec.Cmd, error) {
 	buf := make([]byte, 128)
 	var n int
 	if n, err = stdout.Read(buf); err != nil {
-		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %v", err)
+		return -1, cmd, fmt.Errorf("Failed to read from kubectl proxy stdout: %w", err)
 	}
 	output := string(buf[:n])
 	match := proxyRegexp.FindStringSubmatch(output)
@@ -2268,17 +2364,17 @@ func newBlockingReader(s string) (io.Reader, io.Closer, error) {
 func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ginkgo.By("successfully create CR")
 	if _, err := e2ekubectl.RunKubectlInput(namespace, resource, "create", "--validate=true", "-f", "-"); err != nil {
-		return fmt.Errorf("failed to create CR %s in namespace %s: %v", resource, namespace, err)
+		return fmt.Errorf("failed to create CR %s in namespace %s: %w", resource, namespace, err)
 	}
 	if _, err := e2ekubectl.RunKubectl(namespace, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
-		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+		return fmt.Errorf("failed to delete CR %s: %w", name, err)
 	}
 	ginkgo.By("successfully apply CR")
 	if _, err := e2ekubectl.RunKubectlInput(namespace, resource, "apply", "--validate=true", "-f", "-"); err != nil {
-		return fmt.Errorf("failed to apply CR %s in namespace %s: %v", resource, namespace, err)
+		return fmt.Errorf("failed to apply CR %s in namespace %s: %w", resource, namespace, err)
 	}
 	if _, err := e2ekubectl.RunKubectl(namespace, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
-		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+		return fmt.Errorf("failed to delete CR %s: %w", name, err)
 	}
 	return nil
 }
@@ -2350,4 +2446,39 @@ waitLoop:
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
 	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
+}
+
+// mustListObjectsInNamespace queries all the objects we use for testing in the given namespace.
+// Currently this is just ConfigMaps.
+// We filter our "system" configmaps, like "kube-root-ca.crt".
+func mustListObjectsInNamespace(ctx context.Context, c clientset.Interface, ns string) []runtime.Object {
+	var objects []runtime.Object
+	configMaps, err := c.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		framework.Failf("error listing configmaps: %v", err)
+	}
+	for i := range configMaps.Items {
+		cm := &configMaps.Items[i]
+		if cm.Name == "kube-root-ca.crt" {
+			// Ignore system objects
+			continue
+		}
+		objects = append(objects, cm)
+	}
+	return objects
+}
+
+// mustGetNames returns a slice containing the metadata.name for each object.
+func mustGetNames(objects []runtime.Object) []string {
+	var names []string
+	for _, obj := range objects {
+		metaAccessor, err := meta.Accessor(obj)
+		if err != nil {
+			framework.Failf("error getting accessor for %T: %v", obj, err)
+		}
+		name := metaAccessor.GetName()
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

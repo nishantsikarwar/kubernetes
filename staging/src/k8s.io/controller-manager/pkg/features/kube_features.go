@@ -32,12 +32,19 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
-	// owner: @khenidak
-	// alpha: v1.15
+	// owner: @alexanderConstantinescu
+	// kep: http://kep.k8s.io/3458
+	// beta: v1.27
 	//
-	// Enables ipv6 dual stack
-	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
-	IPv6DualStack featuregate.Feature = "IPv6DualStack"
+	// Enables less load balancer re-configurations by the service controller
+	// (KCCM) as an effect of changing node state.
+	StableLoadBalancerNodeSet featuregate.Feature = "StableLoadBalancerNodeSet"
+
+	// owner: @nckturner
+	// kep:  http://kep.k8s.io/2699
+	// alpha: v1.27
+	// Enable webhook in cloud controller manager
+	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableFeatureGate) error {
@@ -47,5 +54,6 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	IPv6DualStack: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	StableLoadBalancerNodeSet:     {Default: true, PreRelease: featuregate.Beta},
+	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
 }

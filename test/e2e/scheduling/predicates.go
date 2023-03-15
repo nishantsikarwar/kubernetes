@@ -806,7 +806,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		})
 	})
 
-	ginkgo.It("validates Pods with non-empty schedulingGates are blocked on scheduling [Feature:PodSchedulingReadiness] [alpha]", func(ctx context.Context) {
+	ginkgo.It("validates Pods with non-empty schedulingGates are blocked on scheduling", func(ctx context.Context) {
 		podLabel := "e2e-scheduling-gates"
 		replicas := 3
 		ginkgo.By(fmt.Sprintf("Creating a ReplicaSet with replicas=%v, carrying scheduling gates [foo bar]", replicas))
@@ -869,7 +869,7 @@ func patchPod(cs clientset.Interface, old, new *v1.Pod) (*v1.Pod, error) {
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Pod{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create merge patch for Pod %q: %v", old.Name, err)
+		return nil, fmt.Errorf("failed to create merge patch for Pod %q: %w", old.Name, err)
 	}
 	return cs.CoreV1().Pods(new.Namespace).Patch(context.TODO(), new.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 }

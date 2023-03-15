@@ -52,9 +52,16 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+//lint:ignore U1000 we need to alias only for the sake of embedding
 type kubeClientSet = kubernetes.Interface
+
+//lint:ignore U1000 we need to alias only for the sake of embedding
 type aggegatorClientSet = aggregator.Interface
+
+//lint:ignore U1000 we need to alias only for the sake of embedding
 type apiextensionsClientSet = apiextensions.Interface
+
+//lint:ignore U1000 we need to alias only for the sake of embedding
 type dynamicClientset = dynamic.Interface
 type testClientSet struct {
 	kubeClientSet
@@ -192,7 +199,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 	defer cleanup()
 
 	// Create a resource manager whichs serves our GroupVersion
-	resourceManager := discoveryendpoint.NewResourceManager()
+	resourceManager := discoveryendpoint.NewResourceManager("apis")
 	resourceManager.SetGroups([]apidiscoveryv2beta1.APIGroupDiscovery{basicTestGroup})
 
 	// Install our ResourceManager as an Aggregated APIService to the
